@@ -105,6 +105,19 @@ def getRecommendations(prefs, person, similarity=sim_pearson):
 	rankings.sort()
 	rankings.reverse()
 	return rankings
+
+# dictionary 의 안과 밖을 바꾼다.	
+def transformPrefs(prefs):
+	result = {}
+	
+	for person in prefs:
+		for item in prefs[person]:
+			result.setdefault(item,{})
+			result[item][person] = prefs[person][item]
+	return result
+		
+	
+	
 	
 		
 
