@@ -115,6 +115,48 @@ def transformPrefs(prefs):
 			result.setdefault(item,{})
 			result[item][person] = prefs[person][item]
 	return result
+
+# 항목 간 유사한 항목들의 유사도 점수를 계산한다. 
+def calculateSimilarItems(prefs, n=10):
+	result = {}
+
+	# 항목 기반으로 변경한다. 
+	itemPrefs = transformPrefs(prefs)
+	c = 0
+	for item in itemPrefs:
+		c += 1
+		if c % 100 == 0: print "%d / %d" % (c, len(itemPrefs))
+		scores = topMatches(itemPrefs, item, n = n, similarity = sim_distance)
+		result[item] = scores
+
+	return result
+
+# prefs => 사용자, 항목의 점수 matrix
+# itemMatch => 항목간의 유사도
+# user
+# 미리 생성된 항목유사도를 기준으로 user 에게 항목을 추천한다. 
+def getRecommendedItems(prefs, itemMatch, user):
+	userRatings = prefs[user]
+	scores = {}
+	totalSim = {}
+
+	for (item, rating) in userRatings.items():
+		# 미리 생성된 유사도 묶음에서 item 에 해당하는 리스트를 가져온다. 
+		for (similarity, item2) in itemMatch[item]:
+			# 유저가 평가한 아이템이라면 다음 아이템으로 넘어간다. 
+			if item2 in userRatings: continue
+
+			scores.setdefault(item2, 0)
+			# 유사도 * item 평가점수 => 가중치를 부여한다. 
+			scores[item2] += similarity * rating
+
+			totalSim.setdefault(item2, 0)
+			totalSim[item2] += similarity
+
+	rankings = [(score/totalSim[item], item) for item, score in scores.items()]
+	rankings.sort()
+	rankings.reverse()
+	return rankings
 		
 	
 	
