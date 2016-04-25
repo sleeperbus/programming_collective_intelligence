@@ -83,7 +83,7 @@ def topMatches(prefs, person, n = 5, similarity = sim_pearson):
 # 모든 리뷰어 데이터를 사용해서 추천 데이터를 가져온다. 
 # 내가 평가하지 않은 데이터에 한해서 추천을 받는다. 
 def getRecommendations(prefs, person, similarity=sim_pearson):
-	totals = {} # (other 의 평점 x 나와의 유사도) 합계
+	totals = {} # (other 의 평점 x 나와의 유사도) 합계, 나와의 유사도 가중치
 	simSums = {}
 
 	for other in prefs:
@@ -93,11 +93,20 @@ def getRecommendations(prefs, person, similarity=sim_pearson):
 
 		for item in prefs[other]:
 			# 내 평가에 없었던 항목들만 대상으로 삼는다. 
-			if item not in prefs[person] or prefs[pearson][item] == 0:
+			if item not in prefs[person] or prefs[person][item] == 0:
 				totals.setdefault(item, 0)
 				totals[item] += prefs[other][item] * sim
 				simSums.setdefault(item, 0)
 				simSums[item] += sim
+
+	# 가중평가된 합을 유사도 합으로 나눈다. 
+	# 더 객관적인 자료라고 할 수 있다.
+	rankings = [(total/simSums[item], item) for item, total in totals.items()]	
+	rankings.sort()
+	rankings.reverse()
+	return rankings
+	
+		
 
 
 
