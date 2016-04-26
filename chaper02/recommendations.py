@@ -157,6 +157,27 @@ def getRecommendedItems(prefs, itemMatch, user):
 	rankings.sort()
 	rankings.reverse()
 	return rankings
+
+
+# MovieLens 데이터를 로딩한다. 
+def loadMovieLens(path='./ml-100k'):
+	# 영화제목
+	movies = {}
+	for line in open(path + '/u.item'):
+		(id, title) = line.split('|')[0:2]
+		movies[id] = title
+
+	# 유저별 영화점수 데이터를 생성한다. 
+	prefs = {}
+	for line in open(path + '/u.data'):
+		(user, movieID, rating, ts) = line.split('\t')
+		prefs.setdefault(user, {})
+		prefs[user][movies[movieID]] = float(rating)
+
+	return prefs
+
+
+
 		
 	
 	
