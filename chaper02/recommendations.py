@@ -25,6 +25,19 @@ critics={
 
 from math import sqrt
 
+# tanimoto score 를 반환한다. 
+# 0 ~ 1 사이의 값. 비슷할수록 1에 가깝다. 
+def sim_tanimoto(prefs, p1, p2):
+	l1 = prefs[p1].keys()
+	print(l1)
+	l2 = prefs[p2].keys()
+	print(l2)
+	c = [commonItem for commonItem in l1 if commonItem in l2]
+	print(c)
+	score = float(len(c)) / (len(l1) + len(l2) - len(c))
+	return score
+
+
 # euclidean dinstance 의 역을 반환 
 def sim_distance(prefs, person1, person2):
 	# 두 사람 모두에게 포함된 영화들이 있나 살펴본다.
@@ -175,6 +188,7 @@ def loadMovieLens(path='./ml-100k'):
 		prefs[user][movies[movieID]] = float(rating)
 
 	return prefs
+
 
 
 
