@@ -95,13 +95,13 @@ def topMatches(prefs, person, n = 5, similarity = sim_pearson):
 
 # 모든 리뷰어 데이터를 사용해서 추천 데이터를 가져온다. 
 # 내가 평가하지 않은 데이터에 한해서 추천을 받는다. 
-def getRecommendations(prefs, person, similarity=sim_pearson):
+# [수정사항]
+# 2016.04.29 모든 사람과 비교하지 않고 '사용자 유사도 풀' 에서만 비교한다.
+def getRecommendations(prefs, usersim, person):
 	totals = {} # (other 의 평점 x 나와의 유사도) 합계, 나와의 유사도 가중치
 	simSums = {}
 
-	for other in prefs:
-		if other == person: continue
-		sim = similarity(prefs, person, other)
+	for (sim, other) in usersim[person]:
 		if sim <= 0: continue
 
 		for item in prefs[other]:
@@ -143,6 +143,20 @@ def calculateSimilarItems(prefs, n=10):
 		result[item] = scores
 
 	return result
+
+# 사용자간 유사도를 구한다. 
+def calculateSimilarUsers(prefs, n=10):
+	result = {}
+
+	c = 0	
+	for user in prefs:
+		c += 1
+		if c % 100 == 0: print "%d / %d" % (c, len(prefs))
+		scores = topMatches(prefs, user, n = n, similarity = sim_distance)
+		result[user] = scores 
+		
+	return result
+		
 
 # prefs => 사용자, 항목의 점수 matrix
 # itemMatch => 항목간의 유사도
