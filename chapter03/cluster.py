@@ -20,6 +20,14 @@ def readfile(filename):
     data.append([float(x) for x in p[1:]])
   return rownames, colnames, data
 
+# manhattan distance 를 구한다.
+def manhattan(v1, v2):
+  return sum([abs(v1[i] - v2[i]) for i in range(len(v1))])
+
+# euclidean 거리를 구한다. 
+def euclidean(v1, v2):
+  return sqrt(sum([pow(v1[i] - v2[i], 2) for i in range(len(v1))]))
+
 # pearson 계수를 구한다. 
 def pearson(v1,v2):
   # Simple sums
