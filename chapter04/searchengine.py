@@ -3,35 +3,78 @@
 import urllib2
 from BeautifulSoup import *
 from urlparse import urljoin
-from pysqlite2 import dbapi2 as sqlite
+from sqlite3 import dbapi2 as sqlite
+# from pysqlite2 import dbapi2 as sqlite
+
+ignorewords = set(["the", "of", "to", "and", "a", "in", "is", "iGt"])
 
 class crawler:
   def __init__(self, dbname):
-    pass
+    self.con = sqlite.connect(dbname)
 
   def __del__(self):
-    pass
+    self.con.close()
 
   def dbcommit(self):
-    pass
+    self.con.commit()
 
-  # 항목번호를 얻는다. 
+  # 항목번호를 얻는다. 항목이 존재하지 않는다면 새로 만들어서 해당 rowid 를 반환한다. 
   def getEntryID(self, table, field, value, creatnew=True):
-    return None 
+    cur = self.con.execute(
+      "select rowid from %s where %s = '%s'" % (table, field, value))
+    res = cur.fetchone()
+    if res == None:
+      cur = self.con.execute(
+        "insert into %s (%s) values ('%s')" % (table, field, value))
+      return cur.lastrowid
+    else:
+      return res[0]
 
   def addToIndex(self, url, soup):
+    if self.isIndexed(url): return
+
     print "Indexing %s" % url
+
+    text = self.getTextOnly(soup)
+    words = self.seprateWords(text)
+
+    urlid = self.getEntryID("urllist", "url", url)
+
+    for i in range(len(words)):
+      word = words[i]
+      if word in ignorewords: continue
+      wordid = self.getEntryID("wordlist", "word", word)
+      self.con.execute("insert into wordlocation(urlid, wordid, location) \
+        values (%d, %d, %d)" % (urlid, wordid, i))
 
   # 텍스트를 추출한다.
   def getTextOnly(self, soup):
-    return None
+    v = soup.string 
+    # 하위 노드들이 존재한다면..
+    if v == None:
+      c = soup.contents
+      resultText = ""
+      for t in c:
+        subtext = self.getTextOnly(t)
+        resultText += subtext + "\n"
+      return resultText
+    else:
+      return v.strip()
 
   # 단어들을 분리한다.
   def seprateWords(self, text):
-    return None
+    splitter = re.compile("\\W*")
+    return [s.lower() for s in splitter.split(text) if s != ""]
 
-  # 색인한 적이 있는가?
+  # 색인 & 크롤링이 되었는가? 
   def isIndexed(self, url):
+    u = self.con.execute \
+      ("select rowid from urllist where url = '%s'" % url).fetchone()
+    if u != None:
+      # 이미 크롤 되었는지 확인한다.
+      v = self.con.execute(
+        "select * from wordlocation where urlid = %d" % u[0]).fetchone()
+      if v != None: return True
     return False
 
   # 두 페이지 간의 링크를 추가
@@ -68,7 +111,103 @@ class crawler:
 
   # db 테이블들을 생성한다.
   def createIndexTables(self):
-    pass
+    self.con.execute("create table urllist(url)")
+    self.con.execute("create table wordlist(word)")
+    self.con.execute("create table wordlocation(urlid, wordid, location)")
+    self.con.execute("create table link(fromid integer, toid integer)")
+    self.con.execute("create table linkwords(wordid, linkid)")
+    self.con.execute("create index wordidx on wordlist(word)")
+    self.con.execute("create index urlidx on urllist(url)")
+    self.con.execute("create index wordurlidx on wordlocation(wordid)")
+    self.con.execute("create index urltoidx on link(toid)")
+    self.con.execute("create index urlfromidx on link(fromid)")
+    self.dbcommit()
+
+
+class searcher:
+  def __init__(self, dbname):
+    self.con = sqlite.connect(dbname)
+
+  def __del__(self):
+    self.con.close()
+
+  # 쿼리에 매칭되는 결과와 wordid 반환한다. 
+  def getMatchRows(self, q):
+    fieldList = "w0.urlid"
+    tableList = ""
+    clauseList = ""
+    wordids = []
+
+    words = q.split(" ")
+    tableNumber = 0
+
+    for word in words:
+      # 색인된 단어인지 찾는다.
+      wordRow = self.con.execute(
+        "select rowid from wordlist where word = '%s'" % word).fetchone()
+      if wordRow != None:
+        wordid = wordRow[0]
+        wordids.append(wordid)
+        if tableNumber > 0:
+          tableList += ","
+          clauseList += " and "
+          clauseList += "w%d.urlid = w%d.urlid and " % (tableNumber - 1 , tableNumber)
+        fieldList += ", w%d.location" % tableNumber
+        tableList += "wordlocation w%d" % tableNumber
+        clauseList += "w%d.wordid = %d" % (tableNumber, wordid)
+        tableNumber += 1
+
+    fullQuery = "select %s from %s where %s" % (fieldList, tableList, clauseList)
+    cur = self.con.execute(fullQuery)
+    rows = [row for row in cur]
+    return rows, wordids
+
+  # 가중평가된 점수를 가져온다. 
+  def getScoredList(self, rows, wordids):
+    totalScores = dict([(row[0], 0) for row in rows])
+
+    weights = [(1.0, self.frequencyScore(rows))]
+
+    for (weight, scores) in weights:
+      for url in totalScores:
+        totalScores[url] += weight * scores[url]
+
+    return totalScores
+
+  # url 을 가져온다.
+  def getUrlName(self, id):
+    return self.con.execute(
+      "select url from urllist where rowid = %d" % id).fetchone()[0]
+
+  # 쿼리를 던진다.
+  def query(self, q):
+    rows, wordids = self.getMatchRows(q)
+    scores = self.getScoredList(rows, wordids)
+    rankedScores = sorted([(score, url) for (url, score) in scores.items()], reverse=1)
+    for (score, urlid) in rankedScores[0:10]:
+      print "%f\t%s" % (score, self.getUrlName(urlid))
+
+  # 각 평가함수의 결과값을 정규화한다. [0, 1] 사이의 값을 반환한다. 
+  # 결과 중 1이 제일 좋은 값이다.
+  def normalizeScores(self, scores, smallIsBetter=0):
+    vsmall = 0.000001 
+    if smallIsBetter:
+      minScore = min(scores.values())
+      return dict([(url, float(minScore)/max(vsmall, score)) for (url, score) in scores.items()])
+    else:
+      maxScore = max(scores.values())
+      if maxScore == 0: maxScore = vsmall
+      return dict([(url, float(score)/maxScore) for (url, score) in scores.items()])
+
+  # 빈도수로 평가한다.  
+  # row[0] 은 url 이다. url 의 빈도수가 많다는 건, 검색한 단어들이 해당 문서에 많이 포함되어 있다는 것이다. 
+  def frequencyScore(self, rows):
+    counts = dict([(row[0], 0) for row in rows])
+    for row in rows: counts[row[0]] += 1
+    return self.normalizeScores(counts)
+
+
+
 
 
     
