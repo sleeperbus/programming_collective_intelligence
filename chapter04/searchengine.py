@@ -166,7 +166,12 @@ class searcher:
   def getScoredList(self, rows, wordids):
     totalScores = dict([(row[0], 0) for row in rows])
 
-    weights = [(1.0, self.frequencyScore(rows))]
+    weights = [
+                (1.0, self.frequencyScore(rows))
+                , (1.5, self.locationScore(rows))
+                , (1.0, self.distanceScore(rows))
+                ]
+    # weights = [(1.0, self.distanceScore(rows))]
 
     for (weight, scores) in weights:
       for url in totalScores:
@@ -205,6 +210,31 @@ class searcher:
     counts = dict([(row[0], 0) for row in rows])
     for row in rows: counts[row[0]] += 1
     return self.normalizeScores(counts)
+
+  # 각 단어들의 위치를 사용하여 점수를 게산한다. 
+  def locationScore(self, rows):
+    # 초기 점수는 임의의 큰수로 설정한다. 각 단어의 위치합은 아마 이보다는 작을 것이다.  
+    locations = dict([(row[0], 1000000) for row in rows])
+    for row in rows:
+      loc = sum(row[1:])
+      if loc < locations[row[0]]: locations[row[0]] = loc
+
+    return self.normalizeScores(locations, smallIsBetter = 1)
+
+  # 단어들 사이의 거리를 기반으로 한 점수 
+  def distanceScore(self, rows):
+    # 검색어가 한 단어라면 1을 반환한다.
+    if (len(rows[0])) <= 2: return dict([(row[0], 1.0) for row in rows])
+
+    minDist = dict([(row[0], 1000000) for row in rows])
+    for row in rows:
+      dist = sum([abs(row[i] - row[i-1]) for i in range(2, len(row))])
+      if dist < minDist[row[0]]: minDist[row[0]] = dist 
+
+    return self.normalizeScores(minDist, smallIsBetter = 1)
+
+
+
 
 
 
