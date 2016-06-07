@@ -78,9 +78,20 @@ class crawler:
     return False
 
   # 두 페이지 간의 링크를 추가
-  def addLinkRef(self, urlFrom, urlTo, linkText):
-    pass
-
+  def addLinkRef(self, urlFrom, urlTo, linkText): 
+    if urlFrom == urlTo: return 
+    fromid = self.getEntryID("urllist", "url", urlFrom)
+    toid = self.getEntryID("urllist", "url", urlTo)
+    cur = self.con.execute(
+      "insert into link(fromid, toid) values(%d, %d)" % (fromid, toid))
+    linkid = cur.lastrowid
+    words = self.seprateWords(linkText)
+    for word in words:
+      if word in ignorewords: continue
+      wordid = self.getEntryID("wordlist", "word", word)
+      self.con.execute(
+        "insert into linkwords(wordid, linkid) values(%d, %d)" % (wordid, linkid))
+  
   # 페이지 목록을 색인함
   def crawl(self, pages, depth=2):
     for i in range(depth):
