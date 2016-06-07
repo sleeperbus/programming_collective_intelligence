@@ -102,7 +102,11 @@ class crawler:
         except:
           print "Could not open %s" % page 
           continue
-        soup = BeautifulSoup(c.read())
+        try:
+          soup = BeautifulSoup(c.read())
+        except:
+          print "Could not read %s" % page
+          continue
         self.addToIndex(page, soup)
 
         links = soup("a")
@@ -120,7 +124,35 @@ class crawler:
       pages = newpages
 
 
-  # db 테이블들을 생성한다.
+  # db 테이블들을 생성한다.  # 각 링크의 페이지랭크 점수를 계산한다. 
+  def calculatePageRank(self, iter=20):
+    # clear table
+    self.con.execute("drop table if exists pagerank")
+    self.con.execute("create table pagerank(urlid primary key, score)")
+    
+    # 모든 url 을 1 로 초기화 
+    self.con.execute("insert into pagerank select rowid, 1.0 from urllist")
+    self.dbcommit();
+    
+    for i in range(iter):
+      print "Iteration %d" % i 
+      for (urlid, ) in self.con.execute("select rowid from urllist"):
+        # 초기 확률은 0.15로 고정
+        pr = 0.15
+        for (linker, ) in self.con.execute(
+          "select distinct fromid from link where toid=%d" % urlid):
+          linkingPR = self.con.execute(
+            "select score from pagerank where urlid = %d" % linker).fetchone()[0]
+          linkingCount = self.con.execute(
+            "select count(*) from link where fromid = %d" % linker).fetchone()[0]
+          pr += 0.85 * (linkingPR/linkingCount)
+        self.con.execute(
+          "update pagerank set score = %f where urlid = %d" %(pr, urlid))
+      self.dbcommit()
+          
+            
+    
+
   def createIndexTables(self):
     self.con.execute("create table urllist(url)")
     self.con.execute("create table wordlist(word)")
@@ -133,6 +165,8 @@ class crawler:
     self.con.execute("create index urltoidx on link(toid)")
     self.con.execute("create index urlfromidx on link(fromid)")
     self.dbcommit()
+
+    
 
 
 class searcher:
@@ -243,6 +277,15 @@ class searcher:
       if dist < minDist[row[0]]: minDist[row[0]] = dist 
 
     return self.normalizeScores(minDist, smallIsBetter = 1)
+   
+  # inbound link 를 기준으로 점수를 계산한다. 
+  def inboundLinkScore(self, rows):
+    uniqueUrls = set([row[0] for row in rows])
+    inboundCount = dict([(url, self.con.execute(\
+      "select count(*) from link where toid = %d" % url).fetchone()[0]) 
+      for url in uniqueUrls])
+    return self.normalizeScores(inboundCount)
+  
 
 
 
