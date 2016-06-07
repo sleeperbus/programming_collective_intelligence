@@ -20,6 +20,14 @@ def readfile(filename):
     data.append([float(x) for x in p[1:]])
   return rownames, colnames, data
 
+# manhattan distance 를 구한다.
+def manhattan(v1, v2):
+  return sum([abs(v1[i] - v2[i]) for i in range(len(v1))])
+
+# euclidean 거리를 구한다. 
+def euclidean(v1, v2):
+  return sqrt(sum([pow(v1[i] - v2[i], 2) for i in range(len(v1))]))
+
 # pearson 계수를 구한다. 
 def pearson(v1,v2):
   # Simple sums
@@ -191,9 +199,10 @@ def kcluster(rows, distance=pearson, k=4):
   for i in range(len(rows[0]))] for j in range(k)]
 
   lastmatches = None 
+  coredist = [0.0 for i in range(len(rows))]
   # 반복작업 횟수 설정
   for t in range(100):
-    print 'Iteration %d' % t
+    # print 'Iteration %d' % t
     # 각 cluster 에 할당되는 vector 을 저장할 리스트 
     bestmatches = [[] for i in range(k)]
 
@@ -203,7 +212,9 @@ def kcluster(rows, distance=pearson, k=4):
       bestmatch = 0
       for i in range(k):
         d = distance(clusters[i], row)
-        if d < distance(clusters[bestmatch], row): bestmatch = i
+        if d <= distance(clusters[bestmatch], row): 
+          bestmatch = i
+          coredist[j] = d
       bestmatches[bestmatch].append(j)
 
     # bestmatches 가 이전 loop 의 결과와 같다면 빠져나간다. 
@@ -223,8 +234,7 @@ def kcluster(rows, distance=pearson, k=4):
           avgs[j] /= len(bestmatches[i])
         clusters[i] = avgs
 
-  return bestmatches
-
+  return bestmatches, sum(coredist)
 
 # tanamoto 계수 
 def tanamoto(v1, v2):
@@ -237,8 +247,8 @@ def tanamoto(v1, v2):
   return 1.0 - (float(shr) / (c1 + c2 - shr))
 
 ################################################################################
-# data 를 2차원 좌표로 나타낸 묶음을 반환한다. 
-def scaledown(data, distance=pearson, rate=0.01):
+# data 를 n차원 좌표로 나타낸 묶음을 반환한다. 
+def scaledown(data, distance=pearson, rate=0.01, dim=2):
   n = len(data)
 
   # 각 vector 의 실제거리를 구한다. 
@@ -246,9 +256,11 @@ def scaledown(data, distance=pearson, rate=0.01):
 
   outersum = 0.0
 
-  # 2차원 좌표 위의 임의의 n개 점을 설정한다. 
-  loc = [[random.random(), random.random()] for i in range(n)]
-  # 2차원 위 각 점 사이의 거리를 저장할 변수 
+  # n차원 좌표 위의 임의의 데이터를 설정한다. 
+  # loc = [[random.random(), random.random()] for i in range(n)]
+  loc = [[random.random() for i in range(dim)] for x in range(n)]
+
+  # n차원 위 각 점 사이의 거리를 저장할 변수 
   dist2d = [[0.0 for j in range(n)] for i in range(n)]
 
   lasterror = None
@@ -258,10 +270,12 @@ def scaledown(data, distance=pearson, rate=0.01):
       for j in range(n):
         # 동일한 점 사이의 거리는 구할 필요가 없다. 어차피 0
         if i == j: continue
-        dist2d[i][j] = sqrt(sum([pow(loc[i][x] - loc[j][x], 2) for x in range(len(loc[i]))]))
+        dist2d[i][j] = euclidean(loc[i], loc[j])
+        # dist2d[i][j] = sqrt(sum([pow(loc[i][x] - loc[j][x], 2) for x in range(len(loc[i]))]))
 
     # 각 점의 위치를 보정할 값을 설정한다. 
-    grad = [[0.0, 0.0] for i in range(n)]
+    # grad = [[0.0, 0.0] for i in range(n)]
+    grad = [[0.0 for i in range(dim)] for x in range(n)]
 
     totalerror = 0
     for i in range(n):
@@ -278,8 +292,11 @@ def scaledown(data, distance=pearson, rate=0.01):
         # dist2d 와 나누는 이유는? 내 생각으로는, 너무 휙휙 많이 움직이지 않기 위해서... 
         # dist2d 로 나누게 되면 현재의 i, j을 삼각형으로 한 cos, sin 값이 나오는데 
         # 이 값은 0과 1 사이이다. 
-        grad[i][0] += ((loc[i][0] - loc[j][0])/dist2d[j][i]) * errorterm
-        grad[i][1] += ((loc[i][1] - loc[j][1])/dist2d[j][i]) * errorterm
+        temp = [((loc[i][x] - loc[j][x])/dist2d[j][i]) * errorterm for x in range(dim)] 
+        grad[i] = [x + y for x, y in zip(grad[i], temp)]
+        # print grad[i]
+        # grad[i][0] += ((loc[i][0] - loc[j][0])/dist2d[j][i]) * errorterm
+        # grad[i][1] += ((loc[i][1] - loc[j][1])/dist2d[j][i]) * errorterm
 
         # print "(%d, %d) = %f" % (i, j, errorterm)
         totalerror += abs(errorterm)
@@ -290,8 +307,9 @@ def scaledown(data, distance=pearson, rate=0.01):
 
     # 점들의 위치를 이동한다. 
     for k in range(n):
-      loc[k][0] -= rate * grad[k][0]
-      loc[k][1] -= rate * grad[k][1]
+      loc[k] = [x - rate*y for x, y in zip(loc[k], grad[k])]
+      # loc[k][0] -= rate * grad[k][0]
+      # loc[k][1] -= rate * grad[k][1]
 
   return loc
 
@@ -305,6 +323,19 @@ def draw2d(data, labels, jpeg='mds2d.jpg'):
     y = (data[i][1] + 0.5) * 1000
     draw.text((x, y), labels[i], (0, 0, 0))
   img.save(jpeg, 'JPEG')
+
+# 가장 효율적인 k 를 구한다. 
+def kmeanstest(data, ks):
+  mindist = None
+  for x in ks:
+    matches, distsum = kcluster(data, distance=pearson, k=x)
+    print "%d: %f" % (x, distsum)
+    if mindist == None or distsum < mindist:
+      mindist = distsum
+      bestk = x
+      bestmatches = matches
+  return bestk, bestmatches, mindist
+
 
 
 
