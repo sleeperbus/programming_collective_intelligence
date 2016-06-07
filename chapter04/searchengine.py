@@ -215,6 +215,7 @@ class searcher:
                 (1.0, self.frequencyScore(rows))
                 , (1.5, self.locationScore(rows))
                 , (1.0, self.pagerankScore(rows)) 
+                , (0.5, self.linkTextScore(rows, wordids)) 
                 ]
     # weights = [(1.0, self.distanceScore(rows))]
 
@@ -294,6 +295,30 @@ class searcher:
     maxScore = max(pageranks.values())
     normalizedScores = dict([(url, float(score)/maxScore) for (url, score) in pageranks.items()])
     return normalizedScores
+
+  # 링크텍스트를 활용해서 점수를 계산한다. 
+  def linkTextScore(self, rows, wordids):
+    linkScores = dict([(row[0], 0) for row in rows])
+    for wordid in wordids:
+      cur = self.con.execute(
+        " \
+        select  link.fromid, link.toid \
+        from    link, linkwords \
+        where   linkwords.linkid = link.rowid \
+        and     linkwords.wordid = %d \
+        " % wordid)
+      for (fromid, toid) in cur:
+        if toid in linkScores:
+          pr = self.con.execute(
+            "select score from pagerank where urlid = %d" % fromid).fetchone()[0]
+          linkScores[toid] += pr
+    maxScore = max(linkScores.values())
+    normalizedScores = dict([(url, float(score)/maxScore) for (url, score) in linkScores.items()])
+    return normalizedScores
+
+
+
+
   
 
 
