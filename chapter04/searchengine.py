@@ -214,7 +214,7 @@ class searcher:
     weights = [
                 (1.0, self.frequencyScore(rows))
                 , (1.5, self.locationScore(rows))
-                , (1.0, self.distanceScore(rows))
+                , (1.0, self.pagerankScore(rows)) 
                 ]
     # weights = [(1.0, self.distanceScore(rows))]
 
@@ -285,6 +285,15 @@ class searcher:
       "select count(*) from link where toid = %d" % url).fetchone()[0]) 
       for url in uniqueUrls])
     return self.normalizeScores(inboundCount)
+    
+  # pagerank 점수를 계산한다. 
+  def pagerankScore(self, rows):
+    pageranks = dict([(row[0], self.con.execute(
+      "select score from pagerank where urlid = %d" % row[0]).fetchone()[0]) 
+      for row in rows])
+    maxScore = max(pageranks.values())
+    normalizedScores = dict([(url, float(score)/maxScore) for (url, score) in pageranks.items()])
+    return normalizedScores
   
 
 
