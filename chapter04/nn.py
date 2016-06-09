@@ -61,6 +61,64 @@ class searchnet:
       for urlid in urls:
         self.setStrength(hiddenid, urlid, 1, 0.1)
       self.con.commit()
+      
+  # 단어와 URL 에 연결된 hidden unit 을 반환한다.
+  def getAllHiddenIDs(self, wordids, urlids):
+    l1 = {}
+    for wordid in wordids:
+      cur = self.con.execute(
+        "select toid from wordhidden where fromid = %d" % wordid)
+      for row in cur: l1[row[0]] = 1
+    for urlid in urlids:
+      cur = self.con.execute(
+        "select fromid from hiddenurl where toid = %d" % urlid)
+      for row in cur: l1[row[0]] = 1
+    return l1.keys()
+  
+  # 클래스 내용을 설정  
+  def setupNetwork(self, wordids, urlids):
+    self.wordids = wordids
+    self.urlids = urlids
+    self.hiddenids = self.getAllHiddenIDs(wordids, urlids)
+    
+    self.ai = [1.0] * len(self.wordids) 
+    self.ah = [1.0] * len(self.hiddenids)
+    self.ao = [1.0] * len(self.urlids) 
+    
+    self.wi = [[self.getStrength(wordid, hiddenid, 0) 
+      for hiddenid in self.hiddenids] 
+      for wordid in self.wordids]
+    self.wo = [[self.getStrength(hiddenid, urlid, 1) 
+      for urlid in self.urlids] 
+      for hiddenid in self.hiddenids]
+    
+  # forward prop 로 output layer 의 결과를 계산한다.  
+  def feedForward(self):
+    # input layer 의 값은 1 
+    for i in range(len(self.wordids)): self.ai[i] = 1
+    
+    # hidden layer 의 값은 input layer * weight 
+    for j in range(len(self.hiddenids)):
+      sum = 0.0 
+      for i in range(len(self.wordids)):
+        sum = sum + self.ai[i] * self.wi[i][j]
+      self.ah[j] = tanh(sum)
+      
+    # output layer 의 결과를 구한다. 
+    for k in range(len(self.urlids)):
+      sum = 0.0 
+      for j in range(len(self.hiddenids)):
+        sum = sum + self.ah[j] * self.wo[j][k]
+      self.ao[k] = tanh(sum)
+      
+    return self.ao[:]
+    
+  def getResult(self, wordids, urlids):
+    self.setupNetwork(wordids, urlids)
+    return self.feedForward()
+      
+  
+    
 
 
 
