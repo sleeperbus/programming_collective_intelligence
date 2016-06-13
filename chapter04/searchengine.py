@@ -4,9 +4,11 @@ import urllib2
 from BeautifulSoup import *
 from urlparse import urljoin
 from sqlite3 import dbapi2 as sqlite
+import nn
 # from pysqlite2 import dbapi2 as sqlite
 
 ignorewords = set(["the", "of", "to", "and", "a", "in", "is", "iGt"])
+mynet = nn.searchnet("nn.db")
 
 class crawler:
   def __init__(self, dbname):
@@ -237,6 +239,7 @@ class searcher:
     rankedScores = sorted([(score, url) for (url, score) in scores.items()], reverse=1)
     for (score, urlid) in rankedScores[0:10]:
       print "%f\t%s" % (score, self.getUrlName(urlid))
+    return wordids, [r[1] for r in rankedScores[0:10]]
 
   # 각 평가함수의 결과값을 정규화한다. [0, 1] 사이의 값을 반환한다. 
   # 결과 중 1이 제일 좋은 값이다.
@@ -315,6 +318,12 @@ class searcher:
     maxScore = max(linkScores.values())
     normalizedScores = dict([(url, float(score)/maxScore) for (url, score) in linkScores.items()])
     return normalizedScores
+    
+  def nnScore(self, rows, wordids):
+    urlids = [urlid for urlid in set([row[0] for row in rows])]
+    nnres = mynet.getResult(wordids, urlids)
+    scores = dict([(urlids[i], nnres[i]) for i in range(len(urlids))])
+    return self.normalizeScores(scores)
 
 
 

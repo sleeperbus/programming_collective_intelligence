@@ -3,6 +3,9 @@
 from math import tanh
 from sqlite3 import dbapi2 as sqlite 
 
+def dtanh(y):
+  return 1.0 - y*y
+
 class searchnet:
   def __init__(self, dbname):
     self.con = sqlite.connect(dbname)
@@ -116,6 +119,63 @@ class searchnet:
   def getResult(self, wordids, urlids):
     self.setupNetwork(wordids, urlids)
     return self.feedForward()
+    
+  # backprop 를 구현한다. 
+  def backPropagate(self, targets, N = 0.5):
+    # calculate errors for oupt layer
+    outputDeltas = [0.0] * len(self.urlids)
+    for k in range(len(self.urlids)):
+      error = targets[k] - self.ao[k]
+      outputDeltas[k] = dtanh(self.ao[k]) * error
+      
+    # calculate errors for hidden layer 
+    hiddenDeltas = [0.0] * len(self.hiddenids)
+    for j in range(len(self.hiddenids)):
+      error = 0.0
+      for k in range(len(self.urlids)):
+        error = error + outputDeltas[k] * self.wo[j][k]
+      hiddenDeltas[j] = dtanh(self.ah[j]) * error
+      
+    # update ouptput weights 
+    for j in range(len(self.hiddenids)):
+      for k in range(len(self.urlids)):
+        change = outputDeltas[k] * self.ah[j]
+        self.wo[j][k] = self.wo[j][k] + N*change
+        
+    # update input weights 
+    for i in range(len(self.wordids)):
+      for j in range(len(self.hiddenids)):
+        change = hiddenDeltas[j] * self.ai[i]
+        self.wi[i][j] = self.wi[i][j] + N*change
+     
+    # train NN   
+  def trainQuery(self, wordids, urlids, selectedUrl):
+    self.generateHiddenNode(wordids, urlids)
+      
+    self.setupNetwork(wordids, urlids)
+    self.feedForward()
+    targets = [0.0] * len(urlids)
+    targets[urlids.index(selectedUrl)] = 1.0
+    error = self.backPropagate(targets)
+    self.updateDatabase()
+      
+  def updateDatabase(self):
+    for i in range(len(self.wordids)):
+      for j in range(len(self.hiddenids)):
+        self.setStrength(self.wordids[i], self.hiddenids[j], 0, self.wi[i][j])
+    
+    for j in range(len(self.hiddenids)):
+      for k in range(len(self.urlids)):
+        self.setStrength(self.hiddenids[j], self.urlids[k],1, self.wo[j][k])
+    
+    
+    
+      
+  
+        
+    
+    
+      
       
   
     
