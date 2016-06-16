@@ -66,10 +66,22 @@ def scheduleCost(sol):
     totalWait += getMinutes(returnf[0]) - earliestDep
 
   # 자동차 렌탈 고려
-  if latestArrival > earliestDep: totalPrice += 50
-
-
+  if latestArrival > earliestDep: totalPrice += 50  
   return totalPrice + totalWait
+  
+def randomOptimize(domain, costf):
+  best = 999999999
+  bestr = None 
+  for i in range(10000):
+    # create random solution 
+    r = [random.randint(domain[i][0], domain[i][1]) for i in range(len(domain))]
+    cost = costf(r)
+    
+    if cost < best:
+      best = cost 
+      bestr = r
+  return r
+    
 
 
 
