@@ -141,6 +141,58 @@ def annealingOptimize(domain, costf, T=10000.0, cool=0.95, step=1):
 
   return vec
 
+# 유전자 알고리즘
+# 한 세대마다 mutation crossover 를 거친다.
+def geneticOptimize(domain, costf, popsize=50, step=1, mutprob=0.2, elite=0.2, maxiter=100):
+  # mutation operation - 임의 항공편을 변경한다.
+  def mutate(vec):
+    sel = random.randint(0, len(domain)-1)
+    if random.random() < 0.5 and vec[sel] > domain[sel][0]:
+      return vec[0:sel] + [vec[sel]-step] + vec[sel+1:]
+    else: return vec[0:sel] + [vec[sel]+step] + vec[sel+1:] 
+    
+  # crossover operation - 두 개의 벡터를 교배한다.
+  def crossover(r1, r2):
+    sel = random.randint(0, len(domain)-1)
+    return r1[0:sel] + r2[sel:]
+    
+  # build population 
+  pop = []
+  for i in range(popsize):
+    vec = [random.randint(domain[i][0], domain[i][1]) for i in range(len(domain))]
+    pop.append(vec)
+  
+  # 매 세대마다 살아남을 vectors  
+  topElite = int(elite*popsize)
+  
+  for i in range(maxiter):
+    scores = [(costf(v), v) for v in pop]
+    scores.sort() 
+    ranked = [v for (s, v) in scores]
+    
+    # 다음 세대로 넘어갈 벡터들
+    pop = ranked[0:topElite]
+   
+    # 모자란 세대를 보충한다.  
+    while len(pop) < popsize:
+      # mutation
+      if random.random() < mutprob:
+        # choose random vector from pop
+        sel = random.randint(0, topElite)
+        pop.append(mutate(ranked[sel]))
+      else:
+        # crossover 
+        r1 = random.randint(0, topElite)
+        r2 = random.randint(0, topElite)
+        pop.append(crossover(ranked[r1], ranked[r2]))
+    
+    print scores[0][0]
+    
+  return scores[0][1]
+        
+      
+    
+  
     
 
 
