@@ -68,7 +68,8 @@ def scheduleCost(sol):
   # 자동차 렌탈 고려
   if latestArrival > earliestDep: totalPrice += 50  
   return totalPrice + totalWait
-  
+
+# 무작위 솔루션   
 def randomOptimize(domain, costf):
   best = 999999999
   bestr = None 
@@ -81,6 +82,65 @@ def randomOptimize(domain, costf):
       best = cost 
       bestr = r
   return r
+
+# hill climb, 임의 솔루션을 선택한 뒤, 각 비행편의 앞뒤 비행편으로 바꾸었을 때의 비용을 구해본다.
+def hillClimb(domain, costf):
+  sol = [random.randint(domain[i][0], domain[i][1]) for i in range(len(domain))]
+
+  while 1:
+    neighbors = []
+    for j in range(len(domain)):
+      # 현재 비행편의 앞뒤 비행편을 하나씩 선택한다. 
+      if sol[j] > domain[j][0]:
+        neighbors.append(sol[0:j] + [sol[j]+1] + sol[j+1:])
+      if sol[j] < domain[j][1]:
+        neighbors.append(sol[0:j] + [sol[j]-1] + sol[j+1:])
+
+    current = costf(sol)
+    best = current
+    for j in (range(len(neighbors))):
+      cost = costf(neighbors[j])
+      if cost < best: 
+        best = cost 
+        sol = neighbors[j]
+    # 비용이 기존과 같다면 break        
+    if best == current: break
+
+  return sol
+
+# simulated annealing 
+# 특정확률로 나쁜 답을 선택해서 local minimum 을 회피하려고 한다.
+def annealingOptimize(domain, costf, T=10000.0, cool=0.95, step=1):
+  # random initialize 
+  vec = [random.randint(domain[i][0], domain[i][1]) for i in range(len(domain))]
+
+  # 온도는 cool 을 사용해서 감소시킨다. 
+  while T > 0.1:
+    # solution 중 임의의 비행편을 선택한다.
+    sel = random.randint(0, len(domain)-1)
+
+    # 변경할 방향을 선택한다. 
+    dir = random.randint(-step, step)
+
+    newVec = vec[:]
+    newVec[sel] += dir 
+    if newVec[sel] < domain[sel][0]: newVec[sel] = domain[sel][0]
+    if newVec[sel] > domain[sel][1]: newVec[sel] = domain[sel][1]
+
+    # 비용을 계산한다.
+    cost = costf(vec)
+    newCost = costf(newVec)
+
+    # 초기에는 T 가 크기 때문에 높은 확률이 나온다. 
+    p = pow(math.e, -(newCost - cost)/T)
+
+    # 특정상황에서 솔류션을 교체한다. 
+    if (newCost < cost or random.random() < p): vec = newVec
+
+    T = T * cool
+
+  return vec
+
     
 
 
