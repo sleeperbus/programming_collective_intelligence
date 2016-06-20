@@ -149,11 +149,13 @@ def geneticOptimize(domain, costf, popsize=50, step=1, mutprob=0.2, elite=0.2, m
     sel = random.randint(0, len(domain)-1)
     if random.random() < 0.5 and vec[sel] > domain[sel][0]:
       return vec[0:sel] + [vec[sel]-step] + vec[sel+1:]
-    else: return vec[0:sel] + [vec[sel]+step] + vec[sel+1:] 
+    elif vec[sel] < domain[sel][1]:
+      return vec[0:sel] + [vec[sel]+step] + vec[sel+1:] 
+    else: return vec
     
   # crossover operation - 두 개의 벡터를 교배한다.
   def crossover(r1, r2):
-    sel = random.randint(0, len(domain)-1)
+    sel = random.randint(0, len(domain)-2)
     return r1[0:sel] + r2[sel:]
     
   # build population 
