@@ -4,9 +4,11 @@ import urllib2
 from BeautifulSoup import *
 from urlparse import urljoin
 from sqlite3 import dbapi2 as sqlite
+import nn
 # from pysqlite2 import dbapi2 as sqlite
 
 ignorewords = set(["the", "of", "to", "and", "a", "in", "is", "iGt"])
+mynet = nn.searchnet("nn.db")
 
 class crawler:
   def __init__(self, dbname):
@@ -102,7 +104,11 @@ class crawler:
         except:
           print "Could not open %s" % page 
           continue
-        soup = BeautifulSoup(c.read())
+        try:
+          soup = BeautifulSoup(c.read())
+        except:
+          print "Could not read %s" % page
+          continue
         self.addToIndex(page, soup)
 
         links = soup("a")
@@ -120,7 +126,35 @@ class crawler:
       pages = newpages
 
 
-  # db 테이블들을 생성한다.
+  # db 테이블들을 생성한다.  # 각 링크의 페이지랭크 점수를 계산한다. 
+  def calculatePageRank(self, iter=20):
+    # clear table
+    self.con.execute("drop table if exists pagerank")
+    self.con.execute("create table pagerank(urlid primary key, score)")
+    
+    # 모든 url 을 1 로 초기화 
+    self.con.execute("insert into pagerank select rowid, 1.0 from urllist")
+    self.dbcommit();
+    
+    for i in range(iter):
+      print "Iteration %d" % i 
+      for (urlid, ) in self.con.execute("select rowid from urllist"):
+        # 초기 확률은 0.15로 고정
+        pr = 0.15
+        for (linker, ) in self.con.execute(
+          "select distinct fromid from link where toid=%d" % urlid):
+          linkingPR = self.con.execute(
+            "select score from pagerank where urlid = %d" % linker).fetchone()[0]
+          linkingCount = self.con.execute(
+            "select count(*) from link where fromid = %d" % linker).fetchone()[0]
+          pr += 0.85 * (linkingPR/linkingCount)
+        self.con.execute(
+          "update pagerank set score = %f where urlid = %d" %(pr, urlid))
+      self.dbcommit()
+          
+            
+    
+
   def createIndexTables(self):
     self.con.execute("create table urllist(url)")
     self.con.execute("create table wordlist(word)")
@@ -133,6 +167,8 @@ class crawler:
     self.con.execute("create index urltoidx on link(toid)")
     self.con.execute("create index urlfromidx on link(fromid)")
     self.dbcommit()
+
+    
 
 
 class searcher:
@@ -180,7 +216,8 @@ class searcher:
     weights = [
                 (1.0, self.frequencyScore(rows))
                 , (1.5, self.locationScore(rows))
-                , (1.0, self.distanceScore(rows))
+                , (1.0, self.pagerankScore(rows)) 
+                , (0.5, self.linkTextScore(rows, wordids)) 
                 ]
     # weights = [(1.0, self.distanceScore(rows))]
 
@@ -202,6 +239,7 @@ class searcher:
     rankedScores = sorted([(score, url) for (url, score) in scores.items()], reverse=1)
     for (score, urlid) in rankedScores[0:10]:
       print "%f\t%s" % (score, self.getUrlName(urlid))
+    return wordids, [r[1] for r in rankedScores[0:10]]
 
   # 각 평가함수의 결과값을 정규화한다. [0, 1] 사이의 값을 반환한다. 
   # 결과 중 1이 제일 좋은 값이다.
@@ -243,6 +281,54 @@ class searcher:
       if dist < minDist[row[0]]: minDist[row[0]] = dist 
 
     return self.normalizeScores(minDist, smallIsBetter = 1)
+   
+  # inbound link 를 기준으로 점수를 계산한다. 
+  def inboundLinkScore(self, rows):
+    uniqueUrls = set([row[0] for row in rows])
+    inboundCount = dict([(url, self.con.execute(\
+      "select count(*) from link where toid = %d" % url).fetchone()[0]) 
+      for url in uniqueUrls])
+    return self.normalizeScores(inboundCount)
+    
+  # pagerank 점수를 계산한다. 
+  def pagerankScore(self, rows):
+    pageranks = dict([(row[0], self.con.execute(
+      "select score from pagerank where urlid = %d" % row[0]).fetchone()[0]) 
+      for row in rows])
+    maxScore = max(pageranks.values())
+    normalizedScores = dict([(url, float(score)/maxScore) for (url, score) in pageranks.items()])
+    return normalizedScores
+
+  # 링크텍스트를 활용해서 점수를 계산한다. 
+  def linkTextScore(self, rows, wordids):
+    linkScores = dict([(row[0], 0) for row in rows])
+    for wordid in wordids:
+      cur = self.con.execute(
+        " \
+        select  link.fromid, link.toid \
+        from    link, linkwords \
+        where   linkwords.linkid = link.rowid \
+        and     linkwords.wordid = %d \
+        " % wordid)
+      for (fromid, toid) in cur:
+        if toid in linkScores:
+          pr = self.con.execute(
+            "select score from pagerank where urlid = %d" % fromid).fetchone()[0]
+          linkScores[toid] += pr
+    maxScore = max(linkScores.values())
+    normalizedScores = dict([(url, float(score)/maxScore) for (url, score) in linkScores.items()])
+    return normalizedScores
+    
+  def nnScore(self, rows, wordids):
+    urlids = [urlid for urlid in set([row[0] for row in rows])]
+    nnres = mynet.getResult(wordids, urlids)
+    scores = dict([(urlids[i], nnres[i]) for i in range(len(urlids))])
+    return self.normalizeScores(scores)
+
+
+
+
+  
 
 
 
