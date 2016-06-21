@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import math 
+import PIL
 
 people = ['Charlie', 'Augustus', 'Veruca', 'Violet', 'Mike', 'Joe', 'Willy', 'Miranda']
 links =[
@@ -39,6 +40,31 @@ def crossCount(v):
       if ua > 0 and ua < 1 and ub > 0 and ub < 1:
         total += 1
         
+  # penalty for too close nodes
+  for i in range(len(people)):
+    for j in range(i+1, len(people)):
+      (x1, y1), (x2, y2) = loc[people[i]], loc[people[j]] 
+      dist = math.sqrt(math.pow(x1-x2, 2)+math.pow(y1-y2, 2))
+      if dist < 50:
+        total += (1.0 - (dist/50.0))   
+        
   return total
+  
+
+def drawNetwork(sol):
+  img = Image.new('RGB', (400, 400), (255, 255, 255))
+  draw = ImageDraw.Draw(img) 
+  
+  pos = dict([(people[i], (sol[i*2], sol[i*2+1])) for i in range(len(people))])
+ 
+  # draw line 
+  for (a, b) in links:
+    draw.line((pos[a], pos[b]), fill=(255, 0, 0))
+   
+  # draw people 
+  for n, p in pos.items():
+    draw.text(p, n, (0, 0, 0))
+    
+  img.show()
       
     
