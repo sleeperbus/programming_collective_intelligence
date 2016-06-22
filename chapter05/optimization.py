@@ -21,10 +21,18 @@ for line in file("schedule.txt"):
   flights.setdefault((origin, dest), [])
   flights[(origin, dest)].append((depart, arrive, int(price)))
 
+domain = [(0, 9)] * len(people) * 2
+
 # 시간을 분단위로 변환한다. 
 def getMinutes(t):
   x = time.strptime(t, "%H:%M")
   return x[3]*60 + x[4]
+
+# 시간에서 시만 가져온다. 
+def getHour(t):
+  x = time.strptime(t, "%H:%M")
+  return x[3]
+
 
 # 리스트를 사람들이 알아볼 수 있는 형식으로 출력한다. 
 def printSchedule(r):
@@ -55,7 +63,7 @@ def scheduleCost(sol):
     if latestArrival < getMinutes(outbound[1]): latestArrival = getMinutes(outbound[1])
     if earliestDep > getMinutes(returnf[0]): earliestDep = getMinutes(returnf[0])
 
-  # 도착시, 출발시 기다리는 시간을 설정한다. 
+  # 도착시, 출발시 기다리는 시간을 기준으로 페널티를 준다. 
   totalWait = 0
   for d in range(len(sol)/2):
     origin = people[d][1]
@@ -65,9 +73,28 @@ def scheduleCost(sol):
     totalWait += latestArrival - getMinutes(outbound[1])
     totalWait += getMinutes(returnf[0]) - earliestDep
 
+  # 전체비행시간으로 비용을 산출한다. 
+  totalTime = 0
+  for d in range(len(sol)/2):
+    origin = people[d][1]
+    outbound = flights[(origin, destination)][int(sol[2*d])]
+    returnf = flights[(destination, origin)][int(sol[2*d+1])]
+    totalTime += getMinutes(outbound[1]) - getMinutes(outbound[0])
+    totalTime += getMinutes(returnf[1]) - getMinutes(returnf[0])
+
+  # 8시 이전에 출발하는 비행기에는 20달러 페널티
+  toolEarly = 0
+  for d in range(len(sol)/2):
+    origin = people[d][1]
+    outbound = flights[(origin, destination)][int(sol[2*d])]
+    returnf = flights[(destination, origin)][int(sol[2*d+1])]
+
+    if getHour(outbound[0]) <  8: toolEarly += 1
+    if getHour(returnf[0]) <  8: toolEarly += 1
+
   # 자동차 렌탈 고려
   if latestArrival > earliestDep: totalPrice += 50  
-  return totalPrice + totalWait
+  return totalPrice + totalWait + totalTime * 0.5 + toolEarly * 20
 
 # 무작위 솔루션   
 def randomOptimize(domain, costf):
@@ -81,7 +108,7 @@ def randomOptimize(domain, costf):
     if cost < best:
       best = cost 
       bestr = r
-  return r
+  return bestr
 
 # hill climb, 임의 솔루션을 선택한 뒤, 각 비행편의 앞뒤 비행편으로 바꾸었을 때의 비용을 구해본다.
 def hillClimb(domain, costf):
@@ -124,15 +151,17 @@ def annealingOptimize(domain, costf, T=10000.0, cool=0.95, step=1):
 
     newVec = vec[:]
     newVec[sel] += dir 
+    # 범위보정
     if newVec[sel] < domain[sel][0]: newVec[sel] = domain[sel][0]
     if newVec[sel] > domain[sel][1]: newVec[sel] = domain[sel][1]
 
     # 비용을 계산한다.
     cost = costf(vec)
     newCost = costf(newVec)
+    print "cost: %f, newCost: %f" % (cost, newCost)
 
     # 초기에는 T 가 크기 때문에 높은 확률이 나온다. 
-    p = pow(math.e, -(newCost - cost)/T)
+    p = pow(math.e, (-newCost - cost)/T)
 
     # 특정상황에서 솔류션을 교체한다. 
     if (newCost < cost or random.random() < p): vec = newVec
@@ -191,7 +220,22 @@ def geneticOptimize(domain, costf, popsize=50, step=1, mutprob=0.2, elite=0.2, m
     print scores[0][0]
     
   return scores[0][1]
-        
+
+# annealing 방식에 랜덤입력을 넣는다. 
+def randomAnnealingOptimize(domain, costf):
+  best = 999999999
+  bestResult = None 
+
+  for i in range(100):
+    sol = [random.randint(domain[i][0], domain[i][1]) for i in range(len(domain))]
+    newCost = annealingOptimize(domain, costf)
+    if newCost < best:
+      print 'newCost: %f' % newCost
+      best = newCost
+      bestResult = sol
+  return bestResult
+
+
       
     
   

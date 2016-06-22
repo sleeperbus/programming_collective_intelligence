@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import math 
-import PIL
+from PIL import Image, ImageDraw
 
 people = ['Charlie', 'Augustus', 'Veruca', 'Violet', 'Mike', 'Joe', 'Willy', 'Miranda']
 links =[
