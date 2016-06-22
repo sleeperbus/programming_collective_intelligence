@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import math 
-from PIL import Image, ImageDraw
+#from pillow import Image, ImageDraw
 
 people = ['Charlie', 'Augustus', 'Veruca', 'Violet', 'Mike', 'Joe', 'Willy', 'Miranda']
 links =[
@@ -51,20 +51,20 @@ def crossCount(v):
   return total
   
 
-def drawNetwork(sol):
-  img = Image.new('RGB', (400, 400), (255, 255, 255))
-  draw = ImageDraw.Draw(img) 
+# def drawNetwork(sol):
+#   img = Image.new('RGB', (400, 400), (255, 255, 255))
+#   draw = ImageDraw.Draw(img) 
   
-  pos = dict([(people[i], (sol[i*2], sol[i*2+1])) for i in range(len(people))])
+#   pos = dict([(people[i], (sol[i*2], sol[i*2+1])) for i in range(len(people))])
  
-  # draw line 
-  for (a, b) in links:
-    draw.line((pos[a], pos[b]), fill=(255, 0, 0))
+#   # draw line 
+#   for (a, b) in links:
+#     draw.line((pos[a], pos[b]), fill=(255, 0, 0))
    
-  # draw people 
-  for n, p in pos.items():
-    draw.text(p, n, (0, 0, 0))
+#   # draw people 
+#   for n, p in pos.items():
+#     draw.text(p, n, (0, 0, 0))
     
-  img.show()
+#   img.show()
       
     
