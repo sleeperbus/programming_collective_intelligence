@@ -158,7 +158,7 @@ def annealingOptimize(domain, costf, T=10000.0, cool=0.95, step=1):
     # 비용을 계산한다.
     cost = costf(vec)
     newCost = costf(newVec)
-    print "cost: %f, newCost: %f" % (cost, newCost)
+    # print "cost: %f, newCost: %f" % (cost, newCost)
 
     # 초기에는 T 가 크기 때문에 높은 확률이 나온다. 
     p = pow(math.e, (-newCost - cost)/T)
@@ -196,9 +196,22 @@ def geneticOptimize(domain, costf, popsize=50, step=1, mutprob=0.2, elite=0.2, m
   # 매 세대마다 살아남을 vectors  
   topElite = int(elite*popsize)
   
+  bestCost = 9999999999  
+  sameCount = 0
   for i in range(maxiter):
     scores = [(costf(v), v) for v in pop]
     scores.sort() 
+    
+    # cost 가 내려가는지 확인한다.
+    if scores[0][0] < bestCost:
+      bestCost = scores[0][0]
+      sameCount = 0
+    else:
+      sameCount += 1
+    
+    if sameCount == 10:
+      break  
+    
     ranked = [v for (s, v) in scores]
     
     # 다음 세대로 넘어갈 벡터들
@@ -228,11 +241,12 @@ def randomAnnealingOptimize(domain, costf):
 
   for i in range(100):
     sol = [random.randint(domain[i][0], domain[i][1]) for i in range(len(domain))]
-    newCost = annealingOptimize(domain, costf)
+    result = annealingOptimize(domain, costf)
+    newCost = scheduleCost(result)
     if newCost < best:
-      print 'newCost: %f' % newCost
+      print("new cost: %f" % newCost)
       best = newCost
-      bestResult = sol
+      bestResult = result
   return bestResult
 
 
