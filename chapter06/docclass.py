@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import re 
 import math 
+from sqlite3 import dbapi2 as sqlite
 
 def getwords(doc):
   splitter = re.compile('\\W*')
@@ -19,46 +20,66 @@ class classifier:
     self.fc = {}
     self.cc = {}
     self.getFeatures = getFeatures
+    
+  def setdb(self, dbfile):
+    self.con = sqlite.connect(dbfile)
+    self.con.execute('create table if not exists fc(feature, category, count)')
+    self.con.execute('create table if not exists cc(category, count)')
   
   # feature 에 대한 결과분류값을 증가시킨다.
   # 예를 들어 'spam' 에 'bad' 라는 분류값을 증가시킨다.
   def incf(self, f, cat):
-    self.fc.setdefault(f, {})
-    self.fc[f].setdefault(cat, 0)
-    self.fc[f][cat] += 1
-  
+    count = self.fcount(f, cat)
+    if count == 0:
+      self.con.execute("insert into fc values('%s', '%s', 1)" % (f, cat))
+    else:
+      self.con.execute(
+        "update fc set count = %d where feature='%s' and category = '%s'" % 
+        (count+1, f, cat))
+    
   # 결과분류값을 증가시킨다.  
   # 예를 들어 'good' 이라는 분류값을 증가시킨다.
   def incc(self, cat):
-    self.cc.setdefault(cat, 0)
-    self.cc[cat] += 1
+    count = self.catcount(cat)
+    if count == 0:
+      self.con.execute("insert into cc values('%s', 1)" % (cat))
+    else:
+      self.con.execute(
+        "update cc set count = %d where category = '%s'" % (count+1, cat))
    
   # 특정 feature 의 category 개수를 반환한다. 
   # 예를 들어 'spam' 이라는 feature 에서 'good' 이라고 분류된 개수
   def fcount(self, f, cat):
-    if f in self.fc and cat in self.fc[f]:
-      return float(self.fc[f][cat])
-    return 0.0
-  
+    res = self.con.execute(
+      "select count from fc where feature='%s' and category='%s'" % (f, cat)).fetchone()
+    if res == None: return 0
+    else: return float(res[0])
+    
   # 특정 category 에 속한 개수를 반환한다.  
   # 예를 들어 'good' 이라고 결정된 문서수
   def catcount(self, cat):
-    if cat in self.cc:
-      return float(self.cc[cat])
-    return 0.0
+    res = self.con.execute(
+      "select count from cc where category = '%s'" % (cat)).fetchone()
+    if res == None: return 0
+    else: return float(res[0])
   
   # 전체 분류개수를 반환한다. 예를 들어 전체 문서수 
   def totalcount(self):
-    return sum(self.cc.values())
+    res = self.con.execute(
+      "select sum(count) from cc").fetchone()
+    if res == None: return 0
+    else: return res[0]
    
   # 분류를 반환한다. 
   def categories(self):
-    return self.cc.keys()
+    cur = self.con.execute("select category from cc")
+    return [d[0] for d in cur]
     
   def train(self, item, cat):
     features = self.getFeatures(item)
     for f in features: self.incf(f, cat)
     self.incc(cat)
+    self.con.commit()
   
   # 특정 feature 가 어떤 분류에 있을 확률  
   def fprob(self, f, cat):
@@ -106,6 +127,7 @@ class naivebayes(classifier):
   # item 의 분류를 정한다.
   # 가중치가 설정된 분류의 경우, 가중치를 설정해서 선택된 분류를 사용할 
   # 것인지 결정한다.
+  # threshold 를 사용한다.
   def classify(self, item, default=None):
     probs = {}
     max = 0.0
@@ -124,6 +146,17 @@ class naivebayes(classifier):
     
 
 class fisherclassifier(classifier):
+  def __init__(self, getFeatures):
+    classifier.__init__(self, getFeatures)
+    self.minimums = {}
+    
+  def setminimum(self, cat, min):
+    self.minimums[cat] = min
+    
+  def getminimum(self, cat):
+    if cat in self.minimums: return self.minimums[cat]
+    return 0
+  
   # P(F|CAT)
   # feature 가 특정 cat 에 속할 확률, 즉 전체 cat 중에서 특정 cat 에 
   # 속할 확률을 구한다.
@@ -133,4 +166,30 @@ class fisherclassifier(classifier):
     
     freqsum = sum([self.fprob(f, c) for c in self.categories()])
     p = clf / (freqsum)
+    return p
+    
+  def invchi2(self, chi, df):
+    m = chi / 2.0 
+    sum = term = math.exp(-m)
+    for i in range(1, df//2):
+      term *= m / i
+      sum += term 
+    return min(sum, 1.0)
+    
+  def fisherprob(self, item, cat):
+    p = 1
+    features = self.getFeatures(item)
+    for f in features: p *= self.weightedprob(f, cat, self.cprob)
+    fscore = -2 * math.log(p)
+    return self.invchi2(fscore, len(features)*2)
+    
+  def classify(self, item, default=None):
+    best = default 
+    max = 0.0
+    for c in self.categories():
+      p = self.fisherprob(item, c)
+      if p > self.getminimum(c) and p > max: 
+        best = c 
+        max = p
+    return best
   
