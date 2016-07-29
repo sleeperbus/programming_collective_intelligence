@@ -66,6 +66,13 @@ def entropy(rows):
     ent = ent - p*log2(p)
   return ent
 
+def variance(rows):
+  if len(rows) == 0: return 0
+  data = [float(row[len(row)-1]) for row in rows]
+  mean = sum(data)/len(data)
+  variance = sum([(d-mean)**2 for d in data])/len(data)
+  return variance
+
 # 트리를 만들어 나간다. 
 # 각 set 를 (feature, value) 로 나눌 때 entropy 가 가장 낮아지는 방향을 
 # 선택한다.
@@ -164,6 +171,54 @@ def classify(observation, tree):
       if v == tree.value: branch = tree.tb
       else: branch = tree.fb
   return classify(observation, branch)
+
+
+def mdclassify(observation, tree):
+  if tree.results != None:
+    return tree.results
+  else:
+    v = observation[tree.col]
+    # 만약 값이 누락되었다면... 
+    if v == None:
+      tr, fr = mdclassify(observation, tree.tb), mdclassify(observation, tree.fb)
+      tcount = sum(tr.values())
+      fcount = sum(fr.values())
+      tw = float(tcount)/(tcount+fcount)
+      fw = float(fcount)/(tcount+fcount)
+      results = {}
+      for k, v in tr.items(): results[k] = v*tw
+      for k, v in fr.items(): results[k] = v*fw
+      return results
+    else:
+      if isinstance(v, int) or isinstance(v, float):
+        if v >= tree.value: branch = tree.tb
+        else: branch = tree.fb
+      else:
+        if v == tree.value: branch = tree.tb
+        else: branch = tree.fb
+      return mdclassify(observation, branch)
+
+
+# 데이터 가지치기
+def prune(tree, mingain):
+  if tree.tb.results == None:
+    prune(tree.tb, mingain)
+  if tree.fb.results == None:
+    prune(tree.fb, mingain)
+
+  # compare cost
+  if tree.tb.results != None and tree.fb.results != None:
+    tb, fb = [], []
+    for v, c in tree.tb.results.items():
+      tb += [[v]] * c
+    for v, c in tree.fb.results.items():
+      fb += [[v]] * c
+
+    delta = entropy(tb+fb) - ((entropy(tb) + entropy(fb))/2)
+    if delta < mingain:
+      tree.tb, tree.fb = None, None
+      tree.results = uniquecounts(tb+fb)
+    
 
 
 class decisionnode:
