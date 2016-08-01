@@ -76,7 +76,7 @@ def variance(rows):
 # 트리를 만들어 나간다. 
 # 각 set 를 (feature, value) 로 나눌 때 entropy 가 가장 낮아지는 방향을 
 # 선택한다.
-def buildtree(rows, scoref=entropy):
+def buildtree(rows, scoref=entropy, mingain=0):
   if len(rows) == 0: return decisionnode()
   current_score = scoref(rows)
   
@@ -101,7 +101,7 @@ def buildtree(rows, scoref=entropy):
         best_criteria = (col, value)
         best_sets = (set1, set2)
         
-  if best_gain > 0:
+  if best_gain > 0 and best_gain > mingain:
     trueBranch = buildtree(best_sets[0])
     falseBranch = buildtree(best_sets[1])
     return decisionnode(col=best_criteria[0], value=best_criteria[1],
@@ -172,6 +172,8 @@ def classify(observation, tree):
       else: branch = tree.fb
   return classify(observation, branch)
 
+def mergedict(x, y):
+  return dict(x.items() + y.items() + [(k, x[k] + y[k]) for k in set(x)&set(y)])
 
 def mdclassify(observation, tree):
   if tree.results != None:
@@ -188,9 +190,16 @@ def mdclassify(observation, tree):
       results = {}
       for k, v in tr.items(): results[k] = v*tw
       for k, v in fr.items(): results[k] = v*fw
-      return results
+      return results 
     else:
-      if isinstance(v, int) or isinstance(v, float):
+      if isinstance(v, tuple):
+        if tree.value < v[0]:
+          branch = tree.fb
+        elif v[0] <= tree.value and tree.value <= v[1]:
+          return mergedict(mdclassify(observation, tree.fb), mdclassify(observation, tree.tb))
+        else:
+          branch = tree.tb 
+      elif isinstance(v, int) or isinstance(v, float):
         if v >= tree.value: branch = tree.tb
         else: branch = tree.fb
       else:
