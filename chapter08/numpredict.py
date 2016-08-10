@@ -202,12 +202,4 @@ def probabilitygraph(data, vec1, high, k=5, weightf=gaussian, ss=5.0):
   plot(t1, smoothed)
   show()
 
-def probabilitygraph2(data, vec1, high, k=5, weightf=gaussian, ss=5.0):
-  t1 = arange(0.0, high, 0.1)
-  probs = [probguess(data, vec1, v, v+0.1, k, weightf) for v in t1]
-
-  plot(t1, array(probs))
-  show()
-
-
 
