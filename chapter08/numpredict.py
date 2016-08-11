@@ -109,16 +109,16 @@ def dividedata(data,test=0.05):
       trainset.append(row)
   return trainset,testset
 
-def testalgorithm(algf,trainset,testset):
+def testalgorithm(algf,trainset,testset, k=5):
   error=0.0
   for row in testset:
-    guess=algf(trainset,row['input'])
+    guess=algf(trainset,row['input'],k)
     error+=(row['result']-guess)**2
     #print row['result'],guess
   #print error/len(testset)
   return error/len(testset)
 
-def crossvalidate(algf,data,trials=100,test=0.1):
+def crossvalidate(algf,data,k=5,trials=100,test=0.1):
   error=0.0
   for i in range(trials):
     trainset,testset=dividedata(data,test)
@@ -150,6 +150,11 @@ def createcostfunction(algf,data):
   def costf(scale):
     sdata=rescale(data,scale)
     return crossvalidate(algf,sdata,trials=10)
+  return costf
+
+def createkfunction(algf, data):
+  def costf(k):
+    return crossvalidate(algf, data, trials=10, k=k)
   return costf
 
 weightdomain=[(0,20)]*4

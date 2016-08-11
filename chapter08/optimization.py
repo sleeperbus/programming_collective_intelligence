@@ -110,7 +110,7 @@ def annealingoptimize(domain,costf,T=10000.0,cool=0.95,step=1):
     eb=costf(vecb)
     p=pow(math.e,(-eb-ea)/T)
 
-    print vec,ea
+    print vec,ea, ' / ', vecb, eb
 
 
     # Is it better, or does it make the probability
