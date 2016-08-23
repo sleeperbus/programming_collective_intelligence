@@ -41,15 +41,16 @@ def getarticlewords():
   ec = 0
 
   for feed in feedlist:
-    print('%s parsing ...' % feed)
     f = feedparser.parse(feed) 
     for e in f.entries:
-      print('%title: %s ...' % e.title)
-      if e.title in articletitles: continue
-      txt = e.title.encode('utf8') + stripHTML(e.description.encode('utf8'))
-      words = separatewords(txt)
-      articlewords.append({})
-      articletitles.append(e.title)
+      try:
+        if e.title in articletitles: continue
+        txt = e.title.encode('utf8') + stripHTML(e.description.encode('utf8'))
+        words = separatewords(txt)
+        articlewords.append({})
+        articletitles.append(e.title)
+      except:
+        continue
 
       for word in words: 
         allwords.setdefault(word, 0)
