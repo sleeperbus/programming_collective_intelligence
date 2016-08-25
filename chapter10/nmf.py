@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
-
 from numpy import *
 
 def difcost(a, b):
-  print('%dx%d, %dx%d' %(shape(a)[0], shape(a)[1], shape(b)[0], shape(b)[1]))
   dif = 0
   for i in range(shape(a)[0]):
     for j in range(shape(a)[1]):
@@ -25,7 +23,6 @@ def factorize(v, pc = 10, iter = 50):
 
     cost = difcost(v, wh)
     print(('%d: %f') % (i, cost))
-#    if i % 10 == 0: print cost
 
     if cost == 0: break
 
@@ -42,3 +39,4 @@ def factorize(v, pc = 10, iter = 50):
     w = matrix(array(w)*array(wn)/array(wd))
 
   return w,h
+
